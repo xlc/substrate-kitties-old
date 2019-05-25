@@ -1,0 +1,21 @@
+[package]
+authors = ['Parity Technologies <admin@parity.io>']
+edition = '2018'
+name = 'substrate-kitties-runtime-wasm'
+version = '1.0.0'
+
+[features]
+default = []
+std = ['substrate-kitties-runtime/std']
+
+[workspace]
+members = []
+[dependencies.substrate-kitties-runtime]
+default-features = false
+path = '..'
+[profile.release]
+lto = true
+panic = 'abort'
+
+[lib]
+crate-type = ['cdylib']
