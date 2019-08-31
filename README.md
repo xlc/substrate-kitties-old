@@ -4,6 +4,10 @@ Substrate Kitties Runtime built with Substrate 1.0.
 
 This is an alternative implementation of Substrate Kitties from [substrate-collectables-workshop](https://github.com/substrate-developer-hub/substrate-collectables-workshop)
 
+Web UI (Please don't abuse it): https://xlc.github.io/kitties-ui/
+
+Telemetry: https://telemetry.polkadot.io/#list/Substrate%20Kitty
+
 Frontend: https://github.com/xlc/kitties-ui
 
 ![screenshot](screenshot.png)
