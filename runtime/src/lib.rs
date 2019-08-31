@@ -10,9 +10,9 @@ use parity_codec::{Encode, Decode};
 use rstd::prelude::*;
 #[cfg(feature = "std")]
 use primitives::bytes;
-use primitives::{ed25519, sr25519, OpaqueMetadata};
+use primitives::{ed25519, OpaqueMetadata};
 use runtime_primitives::{
-	ApplyResult, transaction_validity::TransactionValidity, generic, create_runtime_str,
+	AnySignature, ApplyResult, transaction_validity::TransactionValidity, generic, create_runtime_str,
 	traits::{self, NumberFor, BlakeTwo256, Block as BlockT, StaticLookup, Verify}
 };
 use client::{
@@ -43,7 +43,7 @@ pub type AuthoritySignature = ed25519::Signature;
 pub type AccountId = <AccountSignature as Verify>::Signer;
 
 /// The type used by authorities to prove their ID.
-pub type AccountSignature = sr25519::Signature;
+pub type AccountSignature = AnySignature;
 
 /// A hash of some data used by the chain.
 pub type Hash = primitives::H256;
