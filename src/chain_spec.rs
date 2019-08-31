@@ -186,9 +186,9 @@ fn demonet_genesis(
 			ids: endowed_accounts.clone(),
 		}),
 		balances: Some(BalancesConfig {
-			transaction_base_fee: 100_000_000,
-			transaction_byte_fee: 1_000_000,
-			existential_deposit: 1_000_000_000,
+			transaction_base_fee: 0,
+			transaction_byte_fee: 0,
+			existential_deposit: 0,
 			transfer_fee: 0,
 			creation_fee: 0,
 			balances: endowed_accounts.iter().cloned().map(|k|(k, 10u128.pow(18+6))).collect(),
