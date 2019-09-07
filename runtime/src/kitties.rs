@@ -176,7 +176,7 @@ impl<T: Trait> Module<T> {
 		ensure!(kitty1.is_some(), "Invalid kitty_id_1");
 		ensure!(kitty2.is_some(), "Invalid kitty_id_2");
 		ensure!(kitty_id_1 != kitty_id_2, "Needs different parent");
-		ensure!(Self::kitty_owner(&kitty_id_1).map(|owner| owner == *sender).unwrap_or(false), "Not onwer of kitty1");
+		ensure!(Self::kitty_owner(&kitty_id_1).map(|owner| owner == *sender).unwrap_or(false), "Not owner of kitty1");
 		ensure!(Self::kitty_owner(&kitty_id_2).map(|owner| owner == *sender).unwrap_or(false), "Not owner of kitty2");
 
 		let kitty_id = Self::next_kitty_id()?;
@@ -212,7 +212,7 @@ mod tests {
 
 	use runtime_io::with_externalities;
 	use primitives::{H256, Blake2Hasher};
-	use support::{impl_outer_origin};
+	use support::{impl_outer_origin, assert_ok, assert_noop};
 	use runtime_primitives::{
 		BuildStorage,
 		traits::{BlakeTwo256, IdentityLookup},
@@ -256,13 +256,24 @@ mod tests {
 		type Currency = balances::Module<Test>;
 		type Event = ();
 	}
+	type Balances = balances::Module<Test>;
 	type KittyModule = Module<Test>;
 	type OwnedKittiesTest = OwnedKitties<Test>;
 
 	// This function basically just builds a genesis storage key/value store according to
 	// our desired mockup.
 	fn new_test_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
-		system::GenesisConfig::<Test>::default().build_storage().unwrap().0.into()
+		let mut t = system::GenesisConfig::<Test>::default().build_storage().unwrap().0;
+		t.extend(balances::GenesisConfig::<Test> {
+			transaction_base_fee: 0,
+			transaction_byte_fee: 0,
+			balances: vec![(1, 10), (2, 20), (3, 30), (4, 40), (5, 50), (6, 60)],
+			existential_deposit: 0,
+			transfer_fee: 0,
+			creation_fee: 0,
+			vesting: vec![],
+		}.build_storage().unwrap().0);
+		t.into()
 	}
 
 	#[test]
@@ -375,6 +386,157 @@ mod tests {
 			assert_eq!(OwnedKittiesTest::get(&(0, Some(2))), None);
 
 			assert_eq!(OwnedKittiesTest::get(&(0, Some(2))), None);
+		});
+	}
+
+	#[test]
+	fn basic_setup_works() {
+		with_externalities(&mut new_test_ext(), || {
+			// Verify Initial Storage
+			assert_eq!(KittyModule::kitties_count(), 0);
+			assert!(KittyModule::kitty(0).is_none());
+			assert_eq!(KittyModule::kitty_owner(0), None);
+			assert_eq!(KittyModule::kitty_price(0), None);
+			assert_eq!(Balances::free_balance(1), 10);
+			assert_eq!(Balances::free_balance(2), 20);
+		});
+	}
+
+	#[test]
+	fn create_works() {
+		with_externalities(&mut new_test_ext(), || {
+			// Call Functions
+			assert_ok!(KittyModule::create(Origin::signed(1)));
+			// Verify Storage
+			assert_eq!(KittyModule::kitties_count(), 1);
+			assert!(KittyModule::kitty(0).is_some());
+			assert_eq!(KittyModule::kitty_owner(0), Some(1));
+			assert_eq!(KittyModule::kitty_price(0), None);
+		});
+	}
+
+	#[test]
+	fn create_handles_basic_errors() {
+		with_externalities(&mut new_test_ext(), || {
+			// Setup
+			<KittiesCount<Test>>::put(u32::max_value());
+			// Call Functions
+			assert_noop!(KittyModule::create(Origin::signed(1)), "Kitties count overflow");
+			// Verify Storage
+			assert_eq!(KittyModule::kitties_count(), u32::max_value());
+			assert!(KittyModule::kitty(0).is_none());
+			assert_eq!(KittyModule::kitty_owner(0), None);
+			assert_eq!(KittyModule::kitty_price(0), None);
+		});
+	}
+
+	#[test]
+	fn transfer_works() {
+		with_externalities(&mut new_test_ext(), || {
+			// Setup
+			assert_ok!(KittyModule::create(Origin::signed(1)));
+			// Call Functions
+			assert_ok!(KittyModule::transfer(Origin::signed(1), 2, 0));
+			// Verify Storage
+			assert_eq!(KittyModule::kitties_count(), 1);
+			assert!(KittyModule::kitty(0).is_some());
+			assert_eq!(KittyModule::kitty_owner(0), Some(2));
+			assert_eq!(KittyModule::kitty_price(0), None);
+		});
+	}
+
+	#[test]
+	fn transfer_handles_basic_errors() {
+		with_externalities(&mut new_test_ext(), || {
+			// Setup
+			assert_ok!(KittyModule::create(Origin::signed(1)));
+			// Call Functions
+			assert_noop!(KittyModule::transfer(Origin::signed(2), 2, 0), "Only owner can transfer kitty");
+			assert_noop!(KittyModule::transfer(Origin::signed(1), 2, 1), "Only owner can transfer kitty");
+			// Verify Storage
+			assert_eq!(KittyModule::kitties_count(), 1);
+			assert!(KittyModule::kitty(0).is_some());
+			assert_eq!(KittyModule::kitty_owner(0), Some(1));
+			assert_eq!(KittyModule::kitty_price(0), None);
+		});
+	}
+
+	#[test]
+	fn breed_works() {
+		with_externalities(&mut new_test_ext(), || {
+			// Setup
+			assert_ok!(KittyModule::create(Origin::signed(1)));
+			assert_ok!(KittyModule::create(Origin::signed(1)));
+			// Call Functions
+			assert_ok!(KittyModule::breed(Origin::signed(1), 0, 1));
+			// Verify Storage
+			assert_eq!(KittyModule::kitties_count(), 3);
+			assert!(KittyModule::kitty(0).is_some());
+			assert!(KittyModule::kitty(1).is_some());
+			assert!(KittyModule::kitty(2).is_some());
+			assert_eq!(KittyModule::kitty_owner(0), Some(1));
+			assert_eq!(KittyModule::kitty_owner(1), Some(1));
+			assert_eq!(KittyModule::kitty_owner(2), Some(1));
+			assert_eq!(KittyModule::kitty_price(0), None);
+			assert_eq!(KittyModule::kitty_price(1), None);
+			assert_eq!(KittyModule::kitty_price(2), None);
+		});
+	}
+
+	#[test]
+	fn breed_handles_basic_errors() {
+		with_externalities(&mut new_test_ext(), || {
+			// Setup
+			assert_ok!(KittyModule::create(Origin::signed(1)));
+			assert_ok!(KittyModule::create(Origin::signed(2)));
+			// Call Functions
+			assert_noop!(KittyModule::breed(Origin::signed(1), 0, 0), "Needs different parent");
+			assert_noop!(KittyModule::breed(Origin::signed(2), 0, 1), "Not owner of kitty1");
+			assert_noop!(KittyModule::breed(Origin::signed(1), 0, 1), "Not owner of kitty2");
+			assert_noop!(KittyModule::breed(Origin::signed(1), 2, 1), "Invalid kitty_id_1");
+			assert_noop!(KittyModule::breed(Origin::signed(1), 0, 2), "Invalid kitty_id_2");
+			// Verify Storage
+			assert_eq!(KittyModule::kitties_count(), 2);
+			assert!(KittyModule::kitty(0).is_some());
+			assert!(KittyModule::kitty(1).is_some());
+			assert!(KittyModule::kitty(2).is_none());
+			assert_eq!(KittyModule::kitty_owner(0), Some(1));
+			assert_eq!(KittyModule::kitty_owner(1), Some(2));
+			assert_eq!(KittyModule::kitty_price(0), None);
+			assert_eq!(KittyModule::kitty_price(1), None);
+		});
+	}
+
+	#[test]
+	fn ask_works() {
+		with_externalities(&mut new_test_ext(), || {
+			// Setup
+			assert_ok!(KittyModule::create(Origin::signed(1)));
+			// Call Functions
+			assert_ok!(KittyModule::ask(Origin::signed(1), 0, Some(10)));
+			// Verify Storage
+			assert_eq!(KittyModule::kitties_count(), 1);
+			assert!(KittyModule::kitty(0).is_some());
+			assert_eq!(KittyModule::kitty_owner(0), Some(1));
+			assert_eq!(KittyModule::kitty_price(0), Some(10));
+		});
+	}
+
+	#[test]
+	fn buy_works() {
+		with_externalities(&mut new_test_ext(), || {
+			// Setup
+			assert_ok!(KittyModule::create(Origin::signed(1)));
+			assert_ok!(KittyModule::ask(Origin::signed(1), 0, Some(10)));
+			// Call Functions
+			assert_ok!(KittyModule::buy(Origin::signed(2), 0, 10));
+			// Verify Storage
+			assert_eq!(KittyModule::kitties_count(), 1);
+			assert!(KittyModule::kitty(0).is_some());
+			assert_eq!(KittyModule::kitty_owner(0), Some(2));
+			assert_eq!(KittyModule::kitty_price(0), None);
+			assert_eq!(Balances::free_balance(1), 20);
+			assert_eq!(Balances::free_balance(2), 10);
 		});
 	}
 }
